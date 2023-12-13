@@ -1,0 +1,4 @@
+pytest
+pytest-cov
+pytest-redis
+flake8-black
