@@ -2,7 +2,7 @@ services:
   app:
     build: .
     container_name: python-app-server
-    command: uvicorn app:papp.fastapi_app --host 0.0.0.0 --port 8000 --reload
+    command: python -m uvicorn --app-dir ./src app:papp.app --host 0.0.0.0 --port 8000
     ports: 
       - 8000:8000
       - 5678:5678

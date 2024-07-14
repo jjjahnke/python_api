@@ -44,7 +44,12 @@ test: deps
 
 ## Build source distribution, install
 build: deps
-	docker build -t docker.io/$(DOCKER_USERNAME)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) .
+	docker build -t testimage .
+
+run: deps build
+	docker-compose -f test-env-compose.yaml down
+	docker-compose -f test-env-compose.yaml up -d
+	${VENV_PYTHON} -m uvicorn --app-dir ./src app:papp.app --host 0.0.0.0 --port 8000 --reload
 
 ## Clean
 
@@ -56,3 +61,6 @@ clean:
 	rm -rf htmlcov
 	find . -name '\.coverage*' -delete
 	rm -rf .pytest_cache
+
+check-python-path:
+	$(VENV_PYTHON) -c "import sys; print(sys.path)"

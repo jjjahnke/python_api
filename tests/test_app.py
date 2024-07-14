@@ -5,7 +5,7 @@ from app import papp as app
 
 @pytest.fixture
 def redisdb():
-    app.redis_client = RedisClient("localhost", 6379, 1).getRedisClient()
+    app.redis = RedisClient("localhost", 6379, 1).getRedisClient()
 
 @pytest.fixture
 def client():
