@@ -34,8 +34,8 @@ help:
 ## Test
 
 lint: deps
-	$(VENV_PYTHON) -m black src/
-	$(VENV_PYTHON) -m flake8 --statistics src/
+	$(VENV_PYTHON) -m black --line-length 88 src/
+	$(VENV_PYTHON) -m flake8 --max-line-length=88 --statistics src/
 
 test: deps
 	docker-compose -f test-env-compose.yaml down

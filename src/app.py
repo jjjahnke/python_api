@@ -40,12 +40,12 @@ async def count():
 
 
 @papp.app.post("/nested")
-async def nested(nested: NestedModel) -> NestedModel:
+async def post_nested(nested: NestedModel) -> NestedModel:
     return nested
 
 
 @papp.app.get("/nested")
-async def nested() -> NestedModel:
+async def get_nested() -> NestedModel:
     return NestedModel(
         test=[
             NestedModel.TestModel(name="foo", age=1, enum="foo"),
@@ -53,22 +53,25 @@ async def nested() -> NestedModel:
         ]
     )
 
+
 users = {}
 
 for i in range(10):
     tmpUser = User(username=f"user_{i}", email=f"email_{i}")
     users[str(tmpUser.uuid)] = tmpUser
 
+
 @papp.app.get("/user/{user_id}")
 async def read_user(user_id: str) -> UserResponse:
     return users[user_id]
+
 
 @papp.app.get("/users")
 async def read_users() -> list[UserResponse]:
     return [UserResponse.newResponse(user) for user in users.values()]
 
+
 @papp.app.post("/user")
 async def create_user(user: UserResponse) -> User:
-    ß
     users[user.uuid] = user
     return user

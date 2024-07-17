@@ -1,15 +1,14 @@
-import datetime
-from typing import List, Union
-from uuid import UUID, uuid4
-from pydantic import BaseModel, Field
+from typing import List
+from uuid import UUID
+from pydantic import BaseModel
 
-from model.db_core import DBCore  
-
+from model.db_core import DBCore
 
 
 class User(DBCore):
     username: str
     email: str
+
 
 class UserResponse(BaseModel):
     uuid: UUID
@@ -19,6 +18,7 @@ class UserResponse(BaseModel):
     def newResponse(user: User):
         return UserResponse(uuid=user.uuid, username=user.username, email=user.email)
 
+
 class OpsInfo(BaseModel):
     name: str
     version: str
@@ -26,6 +26,7 @@ class OpsInfo(BaseModel):
     repo: str
     branch: str
     version: str
+
 
 class Cluster(BaseModel):
     cluster_id: str
@@ -35,11 +36,13 @@ class Cluster(BaseModel):
     ppp_namespace: str
     owner_id: str
 
+
 class Environment(BaseModel):
     environment_id: str
     name: str
     description: str
     clusters: List[str]
+
 
 class Deployable(BaseModel):
     deployable_id: str
@@ -51,7 +54,7 @@ class Deployable(BaseModel):
     status: str
     created_at: str
     updated_at: str
-    
+
 
 class microAG(BaseModel):
     name: str
@@ -64,8 +67,7 @@ class microAG(BaseModel):
     environment: Environment
     deployables: Deployable
 
+
 class DeploymentRequest(BaseModel):
     envionment: str
     deployables: List[Deployable]
-    
-
