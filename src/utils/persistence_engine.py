@@ -3,6 +3,7 @@ from importlib import import_module
 import json
 import os
 import uuid
+from icecream import ic
 
 from model.db_core import DBCore
 
@@ -24,27 +25,63 @@ class PersistenceEngine(ABC):
     @abstractmethod
     def delete_data(self, model: DBCore) -> DBCore:
         pass  # pragma: no cover
+    
+    @abstractmethod
+    def get_keys(self, model_type: str) -> list[str]:
+        pass # pragma: no cover
 
     @abstractmethod
     def list_data(self, model_type: str) -> list[DBCore]:
         pass  # pragma: no cover
+    
+
+class InMemoryPersistenceEngine(PersistenceEngine):
+    def __init__(self):
+        self.data = {}
+
+    def write_data(self, model: DBCore) -> DBCore:
+        self.data[model.uuid] = model
+        return model
+
+    def read_model(self, model: DBCore) -> DBCore:
+        return self.read_data(model.__class__.__name__, model.uuid)
+
+    def read_data(self, model_type: str, uuid: uuid) -> DBCore:
+        record = self.data.get(uuid)
+        if record is None:
+            raise KeyError(f"Record not found: {uuid}")
+        return record
+
+    def delete_data(self, model: DBCore) -> DBCore:
+        if model.uuid not in self.data:
+            raise KeyError(f"Record not found: {model.uuid}")
+        del self.data[model.uuid]
+        return model
+    
+    def get_keys(self, model_type: str) -> list[str]:
+        return [str(key) for key in self.data.keys() if self.data[key].__class__.__name__ == model_type]
+
+    def list_data(self, model_type: str) -> list[DBCore]:
+        return [model for model in self.data.values() if model.__class__.__name__ == model_type]
 
 
 class FilePersistenceEngine(PersistenceEngine):
     def __init__(self, base_path: str):
         self.base_path = base_path
 
-    def make_file_path(self, model: DBCore):
+    def make_file_path(self, model: DBCore) -> str:
         return f"{model.__class__.__name__}+{model.uuid}"
 
-    def check_file(self, file_name: str):
+    def check_file(self, file_name: str, create=True) -> str:
         if not os.path.exists(self.base_path):
             os.makedirs(self.base_path)
 
         file_path = os.path.join(self.base_path, file_name)
-        if not os.path.exists(file_path):
+        if not os.path.exists(file_path) and create:
             with open(file_path, "w") as f:
                 f.write("")
+        elif not os.path.exists(file_path) and not create:
+            raise KeyError(f"Record not found: {file_path.split('+')[-1]}")
 
         return file_path
 
@@ -68,21 +105,33 @@ class FilePersistenceEngine(PersistenceEngine):
         return self.read_data(model.__class__.__name__, model.uuid)
 
     def read_data(self, model_type: str, uuid: uuid) -> DBCore:
-        file_path = self.check_file(f"{model_type}+{uuid}")
+        file_path = self.check_file(f"{model_type}+{uuid}", create=False)
 
         return self.read_file(file_path)
 
-    def read_file(self, file_path):
-        with open(file_path, "r") as f:
-            data = json.load(f)
-            module = import_module(data["__module__"])
-            cls = getattr(module, data["__class__"])
-            return cls.model_validate(json.loads(data["__attributes__"]))
+    def read_file(self, file_path: str) -> DBCore:
+        try: 
+          with open(file_path, "r") as f:
+              data = json.load(f)
+              module = import_module(data["__module__"])
+              cls = getattr(module, data["__class__"])
+              return cls.model_validate(json.loads(data["__attributes__"]))
+        except FileNotFoundError:
+            uuid_str = file_path.split("+")[-1]
+            raise KeyError(f"Record not found: {uuid_str}")
 
     def delete_data(self, model: DBCore) -> DBCore:
         file_path = self.check_file(self.make_file_path(model))
         os.remove(file_path)
         return model
+    
+    def get_keys(self, model_type: str) -> list[str]:
+        files = os.listdir(self.base_path)
+        keys = []
+        for file in files:
+            if str(file).startswith(model_type):
+                keys.append(str(file).split("+")[-1])
+        return keys
 
     def list_data(self, model_type: str) -> list[DBCore]:
         files = os.listdir(self.base_path)

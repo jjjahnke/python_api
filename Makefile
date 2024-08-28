@@ -38,8 +38,8 @@ lint: deps
 	$(VENV_PYTHON) -m flake8 --max-line-length=88 --statistics src/
 
 test: deps
-	docker-compose -f test-env-compose.yaml down
-	docker-compose -f test-env-compose.yaml up -d
+	docker compose -f test-env-compose.yaml down
+	docker compose -f test-env-compose.yaml up -d
 	$(VENV_PYTHON) -m pytest -svv --basetemp=/tmp/pytest --cov=src --cov-report=term-missing --cov-report=json tests/
 
 ## Build source distribution, install
@@ -47,8 +47,8 @@ build: deps
 	docker build -t testimage .
 
 run: deps build
-	docker-compose -f test-env-compose.yaml down
-	docker-compose -f test-env-compose.yaml up -d
+	docker compose -f test-env-compose.yaml down
+	docker compose -f test-env-compose.yaml up -d
 	${VENV_PYTHON} -m uvicorn --app-dir ./src app:papp.app --host 0.0.0.0 --port 8000 --reload
 
 ## Clean

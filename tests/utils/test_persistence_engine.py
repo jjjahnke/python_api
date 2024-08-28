@@ -7,6 +7,7 @@ from unittest.mock import mock_open, patch
 from icecream import ic
 
 from model.db_core import DBCore
+from src.utils.persistence_engine import InMemoryPersistenceEngine
 from utils.persistence_engine import FilePersistenceEngine
 
 class MockDBCore(DBCore):
@@ -48,19 +49,10 @@ def test_read_data_reads_and_reconstructs_model(file_persistence_engine, mocker)
     # Create a real instance of DBCore for testing
     test_uuid = uuid4()
     model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    file_persistence_engine.write_data(model_instance)
     
-    # Serialize the model instance to JSON
-    data = {"__class__": model_instance.__class__.__name__,
-          "__module__": model_instance.__module__, 
-          "__attributes__": model_instance.model_dump_json()}
-    model_json = json.dumps(data)    
-    # Mock the open function to return the serialized model
-    mocker.patch('builtins.open', mocker.mock_open(read_data=model_json))
-    
-    # Attempt to read and reconstruct the model from the mocked file
     reconstructed_model = file_persistence_engine.read_data(DBCore.__name__, str(test_uuid))
     
-    # Assertions to verify the reconstructed model matches the original
     assert type(reconstructed_model) == DBCore
     assert reconstructed_model.uuid == test_uuid
     assert reconstructed_model.is_deleted == False
@@ -130,7 +122,7 @@ def test_read_file_throws_exception_if_file_does_not_exist(file_persistence_engi
     model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
     model_location = os.path.join(file_persistence_engine.base_path, f"{model_instance.__class__.__name__}+{str(test_uuid)}")
     mocker.patch('os.path.exists', return_value=False)
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(KeyError):
       reconstructed_model = file_persistence_engine.read_file(model_location)
 
 def test_read_file_throws_exception_if_file_is_empty(file_persistence_engine, mocker):
@@ -242,4 +234,134 @@ def test_read_model_returns_correct_model(file_persistence_engine, mocker):
 
     assert reconstructed_model1 == model_instance1
     assert reconstructed_model2 == model_instance2
+
+def test_get_keys_returns_correct_keys(file_persistence_engine, mocker):
+    test_uuid1 = uuid4()
+    test_uuid2 = uuid4()
+    model_instance1 = DBCore(uuid=test_uuid1, parent_uuid=None, is_deleted=False)
+    model_instance2 = DBCore(uuid=test_uuid2, parent_uuid=None, is_deleted=False)
+
+    file_persistence_engine.write_data(model_instance1)
+    file_persistence_engine.write_data(model_instance2)
+
+    keys = file_persistence_engine.get_keys(model_instance1.__class__.__name__)
+
+    assert len(keys) == 2
+    assert str(test_uuid1) in keys
+    assert str(test_uuid2) in keys
+
+def test_get_keys_returns_empty_list_if_no_keys(file_persistence_engine, mocker):
+    test_uuid1 = uuid4()
+    test_uuid2 = uuid4()
+    model_instance1 = DBCore(uuid=test_uuid1, parent_uuid=None, is_deleted=False)
+    model_instance2 = DBCore(uuid=test_uuid2, parent_uuid=None, is_deleted=False)
+
+    file_persistence_engine.write_data(model_instance1)
+    file_persistence_engine.write_data(model_instance2)
+
+    keys = file_persistence_engine.get_keys(MockDBCore.__name__)
+
+    assert len(keys) == 0
+
+def test_in_memory_persistence_engine_write_and_read_data():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    
+    # Test write_data
+    written_model = engine.write_data(model_instance)
+    assert written_model == model_instance
+
+    ic(engine.data)
+    
+    # Test read_data
+    read_model = engine.read_data(DBCore.__name__, test_uuid)
+    assert read_model == model_instance
+
+def test_in_memory_persistence_engine_delete_data():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    
+    engine.write_data(model_instance)
+    deleted_model = engine.delete_data(model_instance)
+    assert deleted_model == model_instance
+    
+    with pytest.raises(KeyError):
+        engine.read_data(DBCore.__name__, test_uuid)
+
+def test_in_memory_persistence_engine_get_keys():
+    engine = InMemoryPersistenceEngine()
+    test_uuid1 = uuid4()
+    test_uuid2 = uuid4()
+    model_instance1 = DBCore(uuid=test_uuid1, parent_uuid=None, is_deleted=False)
+    model_instance2 = DBCore(uuid=test_uuid2, parent_uuid=None, is_deleted=False)
+    
+    engine.write_data(model_instance1)
+    engine.write_data(model_instance2)
+    
+    keys = engine.get_keys(DBCore.__name__)
+    assert set(keys) == {str(test_uuid1), str(test_uuid2)}
+
+def test_in_memory_persistence_engine_list_data():
+    engine = InMemoryPersistenceEngine()
+    test_uuid1 = uuid4()
+    test_uuid2 = uuid4()
+    model_instance1 = DBCore(uuid=test_uuid1, parent_uuid=None, is_deleted=False)
+    model_instance2 = DBCore(uuid=test_uuid2, parent_uuid=None, is_deleted=False)
+    
+    engine.write_data(model_instance1)
+    engine.write_data(model_instance2)
+    
+    models = engine.list_data(DBCore.__name__)
+    assert models == [model_instance1, model_instance2]
+
+def test_in_memory_persistence_engine_read_nonexistent_data():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    
+    with pytest.raises(KeyError):
+        engine.read_data(DBCore.__name__, test_uuid)
+
+def test_in_memory_persistence_engine_delete_nonexistent_data():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    
+    with pytest.raises(KeyError):
+        engine.delete_data(model_instance)
+
+def test_in_memory_persistence_engine_list_nonexistent_data():
+    engine = InMemoryPersistenceEngine()
+    
+    models = engine.list_data(DBCore.__name__)
+    assert models == []
+
+def test_in_memory_persistence_engine_read_nonexistent_model():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    
+    with pytest.raises(KeyError):
+        engine.read_model(model_instance)
+
+def test_in_memory_persistence_engine_delete_nonexistent_model():
+    engine = InMemoryPersistenceEngine()
+    test_uuid = uuid4()
+    model_instance = DBCore(uuid=test_uuid, parent_uuid=None, is_deleted=False)
+    
+    with pytest.raises(KeyError):
+        engine.delete_data(model_instance)
+
+def test_in_memory_persistence_engine_list_nonexistent_model():
+    engine = InMemoryPersistenceEngine()
+    
+    models = engine.list_data(MockDBCore.__name__)
+    assert models == []
+
+def test_in_memory_persistence_engine_get_keys_nonexistent_model():
+    engine = InMemoryPersistenceEngine()
+    
+    keys = engine.get_keys(MockDBCore.__name__)
+    assert keys == []
 
